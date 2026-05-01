@@ -1,19 +1,14 @@
 package com.clorand.spherix.utils;
 
+import main.Vec3;
 import org.apache.commons.math3.linear.*;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.stream.Collectors;
 
-/**
- * Utility class for checking if two spherical configurations are isometric (identical up to rotation).
- */
 public class IsometryChecker {
 
-    /**
-     * Compute the inertia tensor for a list of Vec3 points.
-     */
     public static double[][] computeInertiaTensor(List<Vec3> points) {
         double[][] tensor = new double[3][3];
         for (Vec3 p : points) {
@@ -31,17 +26,11 @@ public class IsometryChecker {
         return tensor;
     }
 
-    /**
-     * Get eigenvectors of a 3x3 matrix (as columns).
-     */
     public static RealMatrix getEigenvectors(double[][] matrix) {
         EigenDecomposition eig = new EigenDecomposition(new Array2DRowRealMatrix(matrix));
         return eig.getV();
     }
 
-    /**
-     * Rotate a list of Vec3 points using a rotation matrix.
-     */
     public static List<Vec3> rotatePoints(List<Vec3> points, double[][] rotationMatrix) {
         List<Vec3> rotated = new ArrayList<>();
         for (Vec3 p : points) {
@@ -53,9 +42,6 @@ public class IsometryChecker {
         return rotated;
     }
 
-    /**
-     * Sort Vec3 points lexicographically by x, y, z.
-     */
     public static List<Vec3> sortPoints(List<Vec3> points) {
         return points.stream()
             .sorted(Comparator.comparingDouble((Vec3 p) -> p.x)
@@ -64,9 +50,6 @@ public class IsometryChecker {
             .collect(Collectors.toList());
     }
 
-    /**
-     * Compute canonical form: align to principal axes and sort.
-     */
     public static List<Vec3> canonicalForm(List<Vec3> points) {
         double[][] tensor = computeInertiaTensor(points);
         double[][] eigenvectors = getEigenvectors(tensor).getData();
@@ -74,9 +57,6 @@ public class IsometryChecker {
         return sortPoints(rotated);
     }
 
-    /**
-     * Check if two configurations (List<Vec3>) are isometric (up to rotation).
-     */
     public static boolean isIsometric(List<Vec3> a, List<Vec3> b, double tolerance) {
         if (a.size() != b.size()) return false;
         List<Vec3> canonicalA = canonicalForm(a);
