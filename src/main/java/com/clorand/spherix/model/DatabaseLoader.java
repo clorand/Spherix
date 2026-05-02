@@ -1,26 +1,45 @@
 package com.clorand.spherix.model;
 
+import main.SphereParticle;
 import main.Vec3;
+
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Arrays;
 import java.util.stream.Collectors;
 
-/**
- * Stub class for loading configurations from the database.
- * Replace with actual database logic (e.g., JDBC, JPA).
- */
+import analysis.GoodRunLoader;
+
 public class DatabaseLoader {
-    /**
-     * Load coordinates for a given dbkey.
-     * Stub implementation: returns a hardcoded tetrahedron for testing.
-     */
-    public static List<Vec3> loadCoordinates(String dbkey) {
-        // Example: return a tetrahedron (4 points on the unit sphere)
-        return Arrays.asList(
-            new Vec3(1.0, 1.0, 1.0).normalize(),
-            new Vec3(1.0, -1.0, -1.0).normalize(),
-            new Vec3(-1.0, 1.0, -1.0).normalize(),
-            new Vec3(-1.0, -1.0, 1.0).normalize()
-        );
+	
+	private static GoodRunLoader grl = new GoodRunLoader();
+	
+    public static List<Vec3> loadCoordinates(Long dbkey) {
+        try {
+            // Use GoodRunLoader to fetch the configuration for the given dbkey
+            List<SphereParticle> particles = null;
+			try {
+				particles = grl.loadGoodRunFromDatabase(dbkey);
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+
+            // Convert particles to List<Vec3>
+			List<Vec3> coordinates = new ArrayList<Vec3>();
+			
+			if(null!=particles)
+			{
+			for (SphereParticle p:particles)
+			{
+				Vec3 position = p.getP();
+				coordinates.add(position);
+				
+			}
+			}
+			return coordinates;
+        } catch (Exception e) {
+            System.err.println("Error loading configuration for dbkey=" + dbkey + ": " + e.getMessage());
+            throw new RuntimeException("Failed to load configuration for dbkey=" + dbkey, e);
+        }
     }
 }
