@@ -67,7 +67,7 @@ class MathUtilsTest {
 
     @Test
     void testAllCloseList_WithinTolerance() {
-        List<Vec3> a = Arrays.asList(
+        List<Vec3> a = Arrays.asList( 
             new Vec3(1.0, 2.0, 3.0),
             new Vec3(4.0, 5.0, 6.0)
         );

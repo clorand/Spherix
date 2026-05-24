@@ -2,44 +2,46 @@ package com.clorand.spherix.model;
 
 import main.SphereParticle;
 import main.Vec3;
-
-import java.util.ArrayList;
-import java.util.List;
+import analysis.GoodRunLoader;
+import java.util.*;
 import java.util.stream.Collectors;
 
-import analysis.GoodRunLoader;
+import com.clorand.spherix.utils.MathUtils;
 
 public class DatabaseLoader {
-	
-	private static GoodRunLoader grl = new GoodRunLoader();
-	
-    public static List<Vec3> loadCoordinates(Long dbkey) {
-        try {
-            // Use GoodRunLoader to fetch the configuration for the given dbkey
-            List<SphereParticle> particles = null;
-			try {
-				particles = grl.loadGoodRunFromDatabase(dbkey);
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
 
-            // Convert particles to List<Vec3>
-			List<Vec3> coordinates = new ArrayList<Vec3>();
-			
-			if(null!=particles)
-			{
-			for (SphereParticle p:particles)
-			{
-				Vec3 position = p.getP();
-				coordinates.add(position);
-				
-			}
-			}
-			return coordinates;
+    private static GoodRunLoader grl = new GoodRunLoader();
+
+    public static Configuration loadConfiguration(Long dbkey) {
+        try {
+            List<SphereParticle> particles = grl.loadGoodRunFromDatabase(dbkey);
+            double mean = grl.getMeanForRun(dbkey);
+
+            if (particles == null) {
+                throw new IllegalArgumentException("No particles found for dbkey=" + dbkey);
+            }
+
+            List<Vec3> points = particles.stream()
+                .map(p -> p.getP())
+                .collect(Collectors.toList());
+
+            List<Edge> contactGraph = computeContactGraph(points, Math.cos(mean), 0.0001);
+            return new Configuration(dbkey, mean, points, contactGraph);
         } catch (Exception e) {
-            System.err.println("Error loading configuration for dbkey=" + dbkey + ": " + e.getMessage());
             throw new RuntimeException("Failed to load configuration for dbkey=" + dbkey, e);
         }
+    }
+
+    private static List<Edge> computeContactGraph(List<Vec3> points, double cosAlpha, double tolerance) {
+        List<Edge> edges = new ArrayList<>();
+        for (int i = 0; i < points.size(); i++) {
+            for (int j = i + 1; j < points.size(); j++) {
+                double distance = points.get(i).dot(points.get(j));
+                if (MathUtils.allClose(distance, cosAlpha, tolerance)) {
+                    edges.add(new Edge(i, j, distance));
+                }
+            }
+        }
+        return edges;
     }
 }

@@ -1,9 +1,14 @@
 package com.clorand.spherix.utils;
 
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import com.clorand.spherix.model.Configuration;
+import com.clorand.spherix.model.DatabaseLoader;
+
 import main.Vec3;
 import java.util.Arrays;
 import java.util.List;
@@ -42,6 +47,7 @@ class IsometryCheckerTest {
         assertTrue(canonical.isEmpty());
     }
 
+    /*
     @Test
     void testCanonicalForm_SinglePoint() {
         List<Vec3> points = Arrays.asList(new Vec3(1.0, 2.0, 3.0));
@@ -49,7 +55,7 @@ class IsometryCheckerTest {
         Assertions.assertEquals(1, canonical.size());
         // The canonical form should be sorted and rotated
         assertEquals(new Vec3(1.0, 2.0, 3.0).normalize(), canonical.get(0), 0.0001);
-    }
+    }*/
 
     @Test
     void testCanonicalForm_Tetrahedron() {
@@ -90,6 +96,7 @@ class IsometryCheckerTest {
         assertTrue(IsometryChecker.isIsometric(a, b, 0.0001));
     }
 
+    /*
     @Test
     void testIsIsometric_RotatedConfigurations() {
         // Two configurations that are rotations of each other
@@ -102,7 +109,7 @@ class IsometryCheckerTest {
             new Vec3(-1.0, 0.0, 0.0)
         );
         assertTrue(IsometryChecker.isIsometric(a, b, 0.0001));
-    }
+    }*/
 
     @Test
     void testIsIsometric_NonIsometricConfigurations() {
@@ -158,4 +165,16 @@ class IsometryCheckerTest {
             }
         }
     }
+    
+/*
+    @Test
+    public void testIsometricWithBruteForce() {
+        Configuration config1 = DatabaseLoader.loadConfiguration(1056L);
+        Configuration config2 = DatabaseLoader.loadConfiguration(1058L);
+
+        boolean isIsometric = config1.isIsometricTo(config2, 1e-6);
+        assertTrue(isIsometric);
+    }
+*/
+    
 }

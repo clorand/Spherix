@@ -1,10 +1,15 @@
 package com.clorand.spherix.utils;
-//test
+
 import main.Vec3;
 import java.util.List;
 
 public class MathUtils {
 
+	public static boolean allClose(double a, double b, double tolerance)
+	{
+		return Math.abs(a - b) < tolerance; 
+	}
+	
     public static boolean allClose(Vec3 a, Vec3 b, double tolerance) {
         return Math.abs(a.x - b.x) < tolerance &&
                Math.abs(a.y - b.y) < tolerance &&
