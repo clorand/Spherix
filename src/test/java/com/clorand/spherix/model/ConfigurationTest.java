@@ -159,21 +159,24 @@ public class ConfigurationTest {
     
     @Test
     public void testRotationMatrixForTwoPairs() {
-        // Define the vectors
-        Vec3 a0 = new Vec3(0.000000009747, 0.000000000000, 1.000000000000);
-        Vec3 a1 = new Vec3(0.999131063604, 0.000000000000, 0.041678744487);
-        
-        Vec3 b0 = new Vec3(-0.363507693205, 0.839242149695, 0.404394326316);
-        Vec3 b1 = new Vec3(-0.746250799630, 0.046407324208, -0.664045257728);
+        // Load the configurations from the database
+        Configuration ref = DatabaseLoader.loadConfiguration(1056L);
+        Configuration comp = DatabaseLoader.loadConfiguration(1058L);
+    	
+        Vec3 a0 = ref.getPoints().get(0);
+        Vec3 a1 = ref.getPoints().get(1);
+
+        Vec3 b0 = comp.getPoints().get(4);
+        Vec3 b1 = comp.getPoints().get(7);
 
      // Step 1: Rotate a0 to b0 (unchanged)
         Vec3 axis0 = a0.cross(b0).normalize();
         double angle0 = Math.acos(Math.max(-1.0, Math.min(1.0, a0.dot(b0))));
         RealMatrix R0 = Quaternion.rotationMatrixFromAxisAngle(axis0, angle0);
 
-        // Apply R0 to a0 and a1
-        Vec3 rotatedA0 = rotateVector(a0, R0); // ≈ b0
-        Vec3 rotatedA1 = rotateVector(a1, R0);
+        // Apply R0 to a0 and a1Reverse permutation : [4, 7, 1, 5, 6, 3, 8, 0, 2, 9]
+        Vec3 rotatedA0 = ConfigurationTestUtils.rotateVector(a0, R0); // ≈ b0
+        Vec3 rotatedA1 = ConfigurationTestUtils.rotateVector(a1, R0);
 
         System.out.println("rotatedA1.b0: "+rotatedA1.dot(b0));
         System.out.println("b1.b0: "+b1.dot(b0));
@@ -193,8 +196,8 @@ public class ConfigurationTest {
         RealMatrix R = R1.multiply(R0); // R = R1 * R0
 
         // Apply the final rotation
-        Vec3 finalRotatedA0 = rotateVector(a0, R); // Should match b0
-        Vec3 finalRotatedA1 = rotateVector(a1, R); // Should match b1
+        Vec3 finalRotatedA0 = ConfigurationTestUtils.rotateVector(a0, R); // Should match b0
+        Vec3 finalRotatedA1 = ConfigurationTestUtils.rotateVector(a1, R); // Should match b1
         // check rotatedA0 should be b0
         
         assertTrue(MathUtils.allClose(rotatedA0, b0, 1e-8));
@@ -206,22 +209,37 @@ public class ConfigurationTest {
         System.out.println("R0:\n" + R0);
         System.out.println("R1:\n" + R1);
         System.out.println("R (R1 * R0):\n" + R);
-        
         System.out.println("finalRotatedA0:"+finalRotatedA0);
         System.out.println("finalRotatedA1:"+finalRotatedA1);
-       
-
         
         assertTrue(MathUtils.allClose(finalRotatedA0, b0, 1e-8));
         assertTrue(MathUtils.allClose(finalRotatedA1, b1, 1e-8));
     }
-
-    // Helper method to rotate a vector using a rotation matrix
-    private Vec3 rotateVector(Vec3 v, RealMatrix R) {
-        return new Vec3(
-            R.getEntry(0, 0) * v.x + R.getEntry(0, 1) * v.y + R.getEntry(0, 2) * v.z,
-            R.getEntry(1, 0) * v.x + R.getEntry(1, 1) * v.y + R.getEntry(1, 2) * v.z,
-            R.getEntry(2, 0) * v.x + R.getEntry(2, 1) * v.y + R.getEntry(2, 2) * v.z
-        );
+    
+    @Test
+    public void testEntireConfigurationRotationMatrix()
+    {
+    	
+        // Load the configurations from the database
+        Configuration ref = DatabaseLoader.loadConfiguration(1056L);
+        Configuration comp = DatabaseLoader.loadConfiguration(1058L);
+        
+        
+        Vec3[] a = new Vec3[10];
+        Vec3[] b = new Vec3[10];
+        Vec3[] rotatedA = new Vec3[10];
+        
+        for (int i=0; i<10; i++)
+        {
+        	a[i] = ref.getPoints().get(i);
+        	b[i] = comp.getPoints().get(ConfigurationTestUtils.reversePermutation[i]);
+        	rotatedA[i] = ConfigurationTestUtils.rotateVector(a[i], ConfigurationTestUtils.rotationMatrix);
+        }
+       
+        
+        for (int i=0; i<10; i++)        
+        	assertTrue(MathUtils.allClose(rotatedA[i], b[i], 1e-8));
+    	
     }
+
 }
