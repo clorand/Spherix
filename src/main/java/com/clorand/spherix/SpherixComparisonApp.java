@@ -16,10 +16,14 @@ public class SpherixComparisonApp extends Application {
 
 	@Override
 	public void start(Stage primaryStage) {
-	    ConfigurationComparisonView view = new ConfigurationComparisonView(1056L, 1058L);
+		
+		long refKey = 1056L;
+		long compKey = 1059L;
+		
+	    ConfigurationComparisonView view = new ConfigurationComparisonView(refKey, compKey);
 
 	    // Use a single Scene with depth buffer and anti-aliasing
-	    Scene scene = new Scene(view, 1024, 768, true, SceneAntialiasing.BALANCED);
+	    Scene scene = new Scene(view, 800, 600, true, SceneAntialiasing.BALANCED);
 	    scene.setFill(Color.LIGHTGRAY);
 
 	    // Set up the camera
@@ -40,7 +44,7 @@ public class SpherixComparisonApp extends Application {
 	    pointLight.setTranslateZ(-20);
 	    view.getChildren().add(pointLight);
 
-	    primaryStage.setTitle("Spherix: Comparing dbkey=642 vs. dbkey=643");
+	    primaryStage.setTitle("Spherix: Comparing dbkey="+refKey+" vs. dbkey="+compKey);
 	    primaryStage.setScene(scene);
 	    primaryStage.show();
 

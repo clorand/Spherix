@@ -234,12 +234,33 @@ public class ConfigurationTest {
         	a[i] = ref.getPoints().get(i);
         	b[i] = comp.getPoints().get(ConfigurationTestUtils.reversePermutation[i]);
         	rotatedA[i] = ConfigurationTestUtils.rotateVector(a[i], ConfigurationTestUtils.rotationMatrix);
+        	System.out.println("rotatedA["+i+"]: "+rotatedA[i]);
         }
        
         
-        for (int i=0; i<10; i++)        
+        for (int i=0; i<10; i++)      
+        {
         	assertTrue(MathUtils.allClose(rotatedA[i], b[i], 1e-8));
+        	System.out.println("b["+i+"]: "+b[i]);
+        }
     	
+    }
+    
+
+    @Test
+    public void testIsEquivalentTo() {
+        // Load the known equivalent configurations
+        Configuration ref = DatabaseLoader.loadConfiguration(1056L);
+        Configuration comp = DatabaseLoader.loadConfiguration(1058L);
+
+        // Check if they are equivalent with a small tolerance
+        boolean isEquivalent = ref.isEquivalentTo(comp, 1e-6);
+
+        // Assert that they are equivalent
+        assertTrue(
+            isEquivalent,
+            "Configurations 1056L and 1058L should be equivalent."
+        );
     }
 
 }

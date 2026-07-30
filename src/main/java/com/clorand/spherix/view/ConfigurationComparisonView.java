@@ -11,14 +11,19 @@ import com.clorand.spherix.model.Configuration;
 import com.clorand.spherix.model.DatabaseLoader;
 import com.clorand.spherix.model.Edge;
 import com.clorand.spherix.model.LineMesh;
+import com.clorand.spherix.utils.PermutationFinder;
+import com.clorand.spherix.utils.RotationUtils;
 
 import java.util.*;
+
+import org.apache.commons.math3.linear.MatrixUtils;
+import org.apache.commons.math3.linear.RealMatrix;
 
 public class ConfigurationComparisonView extends Group {
     private final Configuration referenceConfig;
     private final Configuration comparisonConfig;
     private final Group referenceGroup;
-    private final Group comparisonGroup;
+    private Group comparisonGroup;
     private final Rotate rotationX = new Rotate(0, Rotate.X_AXIS);
     private final Rotate rotationY = new Rotate(0, Rotate.Y_AXIS);
     private final Rotate rotationZ = new Rotate(0, Rotate.Z_AXIS);
@@ -115,7 +120,8 @@ public class ConfigurationComparisonView extends Group {
             case Q ->     rotationZ.setAngle(rotationZ.getAngle() - rotationAngle);
             case W ->     rotationZ.setAngle(rotationZ.getAngle() + rotationAngle);
             case R ->     resetRotation();
-            case I ->     checkIsometry();
+            case I ->     checkEquivalence(); 
+            case M ->     matchConfigurations();
         }
     }
 
@@ -124,9 +130,103 @@ public class ConfigurationComparisonView extends Group {
         rotationY.setAngle(0);
         rotationZ.setAngle(0);
     }
-
-    private void checkIsometry() {
-        boolean isIsometric = referenceConfig.isIsometricTo(comparisonConfig, 0.0001);
-        System.out.println("Are configurations isometric? " + isIsometric);
+    
+    private void checkEquivalence() {
+        double tolerance = 1e-6;
+        boolean isEquivalent = referenceConfig.isEquivalentTo(comparisonConfig, tolerance);
+        System.out.println(
+            String.format(
+                "Configurations %d and %d are %sequivalent (tolerance=%.2e).",
+                referenceConfig.getDbkey(),
+                comparisonConfig.getDbkey(),
+                isEquivalent ? "" : "NOT ",
+                tolerance
+            )
+        );
     }
+    
+    /**
+     * If the configurations are equivalent, computes the rotation matrixSystem.out.println("Found Permutation:"+Arrays.stream(permutation).boxed().toArray(Integer[]::new));
+     * and applies it to the comparison configuration.
+     */
+    private void matchConfigurations() {
+        double tolerance = 1e-6;
+        boolean isEquivalent = referenceConfig.isEquivalentTo(comparisonConfig, tolerance);
+
+        if (!isEquivalent) {
+            System.out.println(
+                String.format(
+                    "Configurations %d and %d are NOT equivalent. Cannot match.",
+                    referenceConfig.getDbkey(),
+                    comparisonConfig.getDbkey()
+                )
+            );
+            return;
+        }
+
+        // Step 1: Find the permutation
+        boolean[][] A1 = referenceConfig.getAdjacencyMatrix();
+        boolean[][] A2 = comparisonConfig.getAdjacencyMatrix();
+        int[] permutation = PermutationFinder.findPermutationBruteForce(A1, A2);
+        if (permutation == null) {
+            System.out.println("Failed to find permutation between configurations.");
+            return;
+        }
+
+        // Step 2: Compute reverse permutation
+        int n = permutation.length;
+        int[] reversePermutation = new int[n];
+        for (int i = 0; i < n; i++) {
+            reversePermutation[permutation[i]] = i;
+        }
+
+        // Step 3: Get the first two mapped point pairs
+        Vec3 a0 = referenceConfig.getPoints().get(0);
+        Vec3 a1 = referenceConfig.getPoints().get(1);
+        Vec3 b0 = comparisonConfig.getPoints().get(reversePermutation[0]);
+        Vec3 b1 = comparisonConfig.getPoints().get(reversePermutation[1]);
+
+        // Step 4: Construct the rotation matrix (R: a0→b0, a1→b1)
+        RealMatrix rotationMatrix = RotationUtils.constructRotationMatrix(a0, a1, b0, b1);
+        if (rotationMatrix == null) {
+            System.out.println("Failed to construct rotation matrix.");
+            return;
+        }
+
+        // Step 5: Compute the INVERSE rotation matrix (R⁻¹: b0→a0, b1→a1)
+        RealMatrix inverseRotationMatrix = MatrixUtils.inverse(rotationMatrix);
+
+        // Step 6: Apply the INVERSE rotation matrix to all points in the comparison config
+        List<Vec3> rotatedPoints = new ArrayList<>();
+        for (Vec3 point : comparisonConfig.getPoints()) {
+            Vec3 rotatedPoint = RotationUtils.rotateVector(point, inverseRotationMatrix);
+            rotatedPoints.add(rotatedPoint);
+        }
+
+        // Step 7: Reconstruct degrees and contact graph after permutation
+        double length = Math.cos(comparisonConfig.getMean());      
+        List<Edge> permutedContactGraph = Configuration.computeContactGraph(rotatedPoints, length, 0.0001);
+        Map<Integer, Integer> permutedDegrees = Configuration.computeDegrees(permutedContactGraph);
+        		
+        // Step 8: Recreate the comparison group with rotated points, permuted degrees, and permuted contact graph
+        this.getChildren().remove(comparisonGroup);
+        this.comparisonGroup = createConfigurationGroup(
+            rotatedPoints,
+            Color.RED,
+            permutedDegrees,
+            permutedContactGraph,
+            false
+        );
+        this.comparisonGroup.getTransforms().addAll(rotationX, rotationY, rotationZ);
+        this.getChildren().add(comparisonGroup);
+
+        System.out.println(
+            String.format(
+                "Applied INVERSE rotation matrix and permuted degrees/contact graph to match configurations %d and %d.",
+                referenceConfig.getDbkey(),
+                comparisonConfig.getDbkey()
+            )
+        );
+    } 
+
 }

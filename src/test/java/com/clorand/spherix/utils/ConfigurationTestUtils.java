@@ -74,6 +74,19 @@ import static org.junit.jupiter.api.Assertions.*;import static org.junit.jupiter
     };
 
     
+    public static final boolean[][] EXPECTED_ADJACENCY_MATRIX_1059 = {
+    	    {false, false, true,  true,  false, false, true,  false, false, true},
+    	    {false, false, true,  false, false, true,  true,  true,  false, false},
+    	    {true,  true,  false, true,  false, false, true,  false, false, false},
+    	    {true,  false, true,  false, true,  true,  false, false, false, false},
+    	    {false, false, false, true,  false, true,  false, true,  false, true},
+    	    {false, true,  false, true,  true,  false, false, true,  false, false},
+    	    {true,  true,  true,  false, false, false, false, false, true,  false},
+    	    {false, true,  false, false, true,  true,  false, false, true,  false},
+    	    {false, false, false, false, false, false, true,  true,  false, true},
+    	    {true,  false, false, false, true,  false, false, false, true,  false}
+    	};
+    
     public static final Vec3 a0 = new Vec3(0.000000009747, 0.000000000000, 1.000000000000);
     public static final Vec3 a1 = new Vec3(0.999131063604, 0.000000000000, 0.041678744487);
     public static final Vec3 b0 = new Vec3(-0.746250799630, 0.046407324208, -0.664045257728);

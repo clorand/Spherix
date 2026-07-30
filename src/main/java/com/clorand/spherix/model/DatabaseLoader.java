@@ -25,23 +25,10 @@ public class DatabaseLoader {
                 .map(p -> p.getP())
                 .collect(Collectors.toList());
 
-            List<Edge> contactGraph = computeContactGraph(points, Math.cos(mean), 0.0001);
-            return new Configuration(dbkey, mean, points, contactGraph);
+            return new Configuration(dbkey, mean, points);
         } catch (Exception e) {
             throw new RuntimeException("Failed to load configuration for dbkey=" + dbkey, e);
         }
     }
 
-    private static List<Edge> computeContactGraph(List<Vec3> points, double cosAlpha, double tolerance) {
-        List<Edge> edges = new ArrayList<>();
-        for (int i = 0; i < points.size(); i++) {
-            for (int j = i + 1; j < points.size(); j++) {
-                double distance = points.get(i).dot(points.get(j));
-                if (MathUtils.allClose(distance, cosAlpha, tolerance)) {
-                    edges.add(new Edge(i, j, distance));
-                }
-            }
-        }
-        return edges;
-    }
 }
