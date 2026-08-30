@@ -132,7 +132,7 @@ public class ConfigurationComparisonView extends Group {
     }
     
     private void checkEquivalence() {
-        double tolerance = 1e-6;
+        double tolerance = 1e-8;
         boolean isEquivalent = referenceConfig.isEquivalentTo(comparisonConfig, tolerance);
         System.out.println(
             String.format(

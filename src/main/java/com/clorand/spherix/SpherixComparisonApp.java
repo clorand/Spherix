@@ -20,7 +20,7 @@ public class SpherixComparisonApp extends Application {
 	public void start(Stage primaryStage) {
 		
 		long refKey = 1056L;
-		long compKey = 1059L;
+		long compKey = 1058L;
 		
 	    ConfigurationComparisonView view = new ConfigurationComparisonView(refKey, compKey);
 
