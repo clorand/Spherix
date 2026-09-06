@@ -62,33 +62,6 @@ faces = [
     [0, 4, 5, 1],   # Face E
 ]
 
-# Manually define the dual graph edges based on the correct dual graph
-# Dual graph vertices: A=0, B=1, C=2, D=3, E=4
-dual_edges = [
-(4, 0), 
-(4, 1), 
-(4, 2), 
-(4, 3), 
-(0, 1), 
-(0, 3), 
-(1, 3), 
-(1, 2), 
-(2, 3)
-]
-
-# Construct the dual graph
-dual_G = nx.Graph()
-dual_G.add_edges_from(dual_edges)
-
-print("\nDual Graph Edges:")
-for edge in dual_G.edges():
-    print(f"Dual Edge: {edge}")
-
-# Plot the dual graph
-plt.figure(figsize=(8, 6))
-nx.draw(dual_G, with_labels=True, node_color='lightblue', edge_color='gray')
-plt.title("Dual Graph")
-plt.show()
 
 # Plot the original graph
 plt.figure(figsize=(10, 8))
@@ -115,3 +88,5 @@ plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.axis('equal')
 plt.tight_layout()
 plt.show()
+
+
