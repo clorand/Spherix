@@ -2,12 +2,26 @@ package com.clorand.spherix.graph;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import org.apache.commons.math3.linear.*;
+import java.util.*;
 
 public class Graph {
     private List<Vertex> vertices;
     private List<Edge> edges;
     private Map<Integer, Vertex> vertexMap; // For quick lookup by ID
 
+    public enum ExtendDirection {
+        HORIZONTAL,
+        VERTICAL
+    }
+    
+    public enum BoundaryDirection {
+        LEFT,   // Leftmost vertex (smallest x-coordinate)
+        RIGHT,  // Rightmost vertex (largest x-coordinate)
+        UP,     // Northmost vertex (largest y-coordinate)
+        DOWN    // Southmost vertex (smallest y-coordinate)
+    }
+    
     public Graph() {
         this.vertices = new ArrayList<>();
         this.edges = new ArrayList<>();
@@ -261,44 +275,268 @@ public class Graph {
         return faces;
     }
     
- // Get the leftmost vertex (smallest x-coordinate)
-    public Vertex getLeftmostVertex() {
+ // Get the boundary vertex based on the specified direction
+    public Vertex getBoundaryVertex(BoundaryDirection direction) {
         if (vertices.isEmpty()) {
             return null;
         }
-        return vertices.stream()
-                .min(Comparator.comparingDouble(Vertex::getX))
-                .orElse(null);
-    }
 
-    // Get the rightmost vertex (largest x-coordinate)
-    public Vertex getRightmostVertex() {
-        if (vertices.isEmpty()) {
-            return null;
+        switch (direction) {
+            case LEFT:
+                return vertices.stream()
+                        .min(Comparator.comparingDouble(Vertex::getX))
+                        .orElse(null);
+            case RIGHT:
+                return vertices.stream()
+                        .max(Comparator.comparingDouble(Vertex::getX))
+                        .orElse(null);
+            case UP:
+                return vertices.stream()
+                        .max(Comparator.comparingDouble(Vertex::getY))
+                        .orElse(null);
+            case DOWN:
+                return vertices.stream()
+                        .min(Comparator.comparingDouble(Vertex::getY))
+                        .orElse(null);
+            default:
+                return null;
         }
-        return vertices.stream()
-                .max(Comparator.comparingDouble(Vertex::getX))
-                .orElse(null);
-    }
-
-    // Get the northmost vertex (largest y-coordinate)
-    public Vertex getNorthmostVertex() {
-        if (vertices.isEmpty()) {
-            return null;
-        }
-        return vertices.stream()
-                .max(Comparator.comparingDouble(Vertex::getY))
-                .orElse(null);
-    }
-
-    // Get the southmost vertex (smallest y-coordinate)
-    public Vertex getSouthmostVertex() {
-        if (vertices.isEmpty()) {
-            return null;
-        }
-        return vertices.stream()
-                .min(Comparator.comparingDouble(Vertex::getY))
-                .orElse(null);
     }
     
+    public void extend(ExtendDirection direction) {
+        if (vertices.isEmpty()) {
+            return; // No vertices to extend
+        }
+
+        Vertex leftmost = getBoundaryVertex(BoundaryDirection.LEFT);
+        Vertex rightmost = getBoundaryVertex(BoundaryDirection.RIGHT);
+        Vertex northmost = getBoundaryVertex(BoundaryDirection.UP);
+        Vertex southmost = getBoundaryVertex(BoundaryDirection.DOWN);
+
+        if (direction == ExtendDirection.HORIZONTAL) {
+            // Add left and right vertices (6 and 7)
+            Vertex left = new Vertex(vertices.size(), leftmost.getX() - 1, leftmost.getY());
+            Vertex right = new Vertex(vertices.size() + 1, rightmost.getX() + 1, rightmost.getY());
+            addVertex(left);
+            addVertex(right);
+
+            // Add edges: 6-5, 6-0, 7-5, 7-0
+            addEdge(new Edge(left, southmost));   // 6-5
+            addEdge(new Edge(left, northmost));   // 6-0
+            addEdge(new Edge(right, southmost));  // 7-5
+            addEdge(new Edge(right, northmost));  // 7-0
+
+        } else if (direction == ExtendDirection.VERTICAL) {
+            // Add top and bottom vertices
+            Vertex top = new Vertex(vertices.size(), northmost.getX(), northmost.getY() + 1);
+            Vertex bottom = new Vertex(vertices.size() + 1, southmost.getX(), southmost.getY() - 1);
+            addVertex(top);
+            addVertex(bottom);
+
+            // Add edges to connect the new vertices to the leftmost and rightmost vertices
+            addEdge(new Edge(top, leftmost));     // Top to leftmost
+            addEdge(new Edge(top, rightmost));    // Top to rightmost
+            addEdge(new Edge(bottom, leftmost));  // Bottom to leftmost
+            addEdge(new Edge(bottom, rightmost)); // Bottom to rightmost
+        }
+    }
+    
+ // Get the list of faces that contain the boundary vertex (e.g., leftmost, rightmost, etc.)
+    public List<List<Integer>> getBoundaryFaces(BoundaryDirection direction) {
+        Vertex boundaryVertex = getBoundaryVertex(direction);
+        if (boundaryVertex == null) {
+            return new ArrayList<>(); // No boundary vertex found
+        }
+
+        List<List<Integer>> boundaryFaces = new ArrayList<>();
+        List<List<Integer>> allFaces = findFaces();
+
+        for (List<Integer> face : allFaces) {
+            if (face.contains(boundaryVertex.getId())) {
+                boundaryFaces.add(face);
+            }
+        }
+
+        return boundaryFaces;
+    }
+    
+    
+    public void stretch(ExtendDirection direction, Vertex start, Vertex end) {
+        if (vertices.isEmpty() || start == null || end == null) {
+            return; // No vertices or invalid start/end
+        }
+
+        // Step 1: Fix start position = 0 and end position = 1
+        int n = vertices.size();
+        int startIndex = start.getId();
+        int endIndex = end.getId();
+
+        // Step 2: Extract the free vertices Laplacian matrix by removing the fixed positions
+        int[][] laplacianMatrixInt = getLaplacianMatrix();
+
+        // Convert int[][] to double[][] for RealMatrix
+        double[][] laplacianMatrix = new double[n][n];
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                laplacianMatrix[i][j] = laplacianMatrixInt[i][j]; // Manual copy
+            }
+        }
+
+        // Create RealMatrix for the full Laplacian
+        RealMatrix laplacian = MatrixUtils.createRealMatrix(laplacianMatrix);
+
+        // Identify free vertices (all vertices except start and end)
+        List<Integer> freeIndices = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            if (i != startIndex && i != endIndex) {
+                freeIndices.add(i);
+            }
+        }
+
+        // Extract the submatrix for free vertices (L_ff)
+        int m = freeIndices.size();
+        int[] freeIndicesArray = freeIndices.stream().mapToInt(Integer::intValue).toArray();
+        RealMatrix freeLaplacian = laplacian.getSubMatrix(freeIndicesArray, freeIndicesArray);
+
+        // Step 3: Compute the comatrix (adjugate) of the free Laplacian matrix
+        RealMatrix comatrix = computeAdjugate(freeLaplacian);
+
+        // Step 4: Compute the fixed positions vector (b_free)
+        // Extract the submatrix L_fk (rows: free vertices, columns: fixed vertices)
+        int[] fixedIndices = {startIndex, endIndex};
+        RealMatrix L_fk = laplacian.getSubMatrix(freeIndicesArray, fixedIndices);
+
+        // Compute b_free = -L_fk * [0; 1] = -L_fk[:, end] (since x_start = 0)
+        double[] bFree = new double[m];
+        for (int i = 0; i < m; i++) {
+            bFree[i] = -L_fk.getEntry(i, 1); // endIndex is 1 in the fixed vector [0; 1]
+        }
+
+        // Step 5: Compute stretched positions: x_free = comatrix * b_free
+        RealVector stretchedPositions = comatrix.operate(new ArrayRealVector(bFree));
+        
+        System.out.println("stretchedPositions:"+stretchedPositions);
+
+        // Step 6: Update the coordinates of the free vertices
+        for (int i = 0; i < m; i++) {
+            int vertexId = freeIndices.get(i);
+            Vertex vertex = getVertexById(vertexId);
+            double stretchedValue = stretchedPositions.getEntry(i);
+
+            if (direction == ExtendDirection.HORIZONTAL) {
+                vertex.setX(stretchedValue);
+            } else if (direction == ExtendDirection.VERTICAL) {
+                vertex.setY(stretchedValue);
+            }
+        }
+        
+        // Step 7: Compute the determinant of the comatrix
+        double detL_ff = new LUDecomposition(freeLaplacian).getDeterminant();
+
+        // Step 8: Update the coordinates of the fixed vertices (start and end)
+        if (direction == ExtendDirection.HORIZONTAL) {
+            start.setX(0.0 * detL_ff);
+            end.setX(1.0 * detL_ff);
+        } else if (direction == ExtendDirection.VERTICAL) {
+            start.setY(0.0 * detL_ff);
+            end.setY(1.0 * detL_ff);
+        }
+    }
+
+    // Helper method to compute the adjugate (comatrix) of a matrix
+    private RealMatrix computeAdjugate(RealMatrix matrix) {
+        int n = matrix.getRowDimension();
+        double[][] adjugateData = new double[n][n];
+
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                // Compute the cofactor C_ij = (-1)^(i+j) * det(M_ij)
+                RealMatrix minor = matrix.getSubMatrix(
+                    removeIndex(matrix.getRowDimension(), i),
+                    removeIndex(matrix.getColumnDimension(), j)
+                );
+                double cofactor = Math.pow(-1, i + j) * new LUDecomposition(minor).getDeterminant();
+                adjugateData[j][i] = cofactor; // Transpose for adjugate
+            }
+        }
+
+        return MatrixUtils.createRealMatrix(adjugateData);
+    }
+
+    // Helper method to create an array without a specific index
+    private int[] removeIndex(int length, int indexToRemove) {
+        int[] indices = new int[length - 1];
+        int pos = 0;
+        for (int i = 0; i < length; i++) {
+            if (i != indexToRemove) {
+                indices[pos++] = i;
+            }
+        }
+        return indices;
+    }
+    
+    public Graph getDualGraph() {
+        // Step 1: Extend the graph horizontally
+        extend(ExtendDirection.HORIZONTAL);
+
+
+        // Step 2: Detect the faces of the extended graph
+        List<List<Integer>> faces = findFaces();
+
+        // Step 3: Identify and remove the outer face
+        // The outer face is the one that contains the leftmost, rightmost, northmost, and southmost vertices
+        Vertex leftmost = getBoundaryVertex(BoundaryDirection.LEFT);
+        Vertex rightmost = getBoundaryVertex(BoundaryDirection.RIGHT);
+        Vertex northmost = getBoundaryVertex(BoundaryDirection.UP);
+        Vertex southmost = getBoundaryVertex(BoundaryDirection.DOWN);
+
+        List<List<Integer>> innerFaces = new ArrayList<>();
+        for (List<Integer> face : faces) {
+            if (!face.contains(leftmost.getId()) ||
+                !face.contains(rightmost.getId()) ||
+                !face.contains(northmost.getId()) ||
+                !face.contains(southmost.getId())) {
+                innerFaces.add(face);
+            }
+        }
+
+        // Step 4: Build the dual graph by mapping the remaining faces to vertices
+        Graph dualGraph = new Graph();
+        Map<List<Integer>, Vertex> faceToVertexMap = new HashMap<>();
+
+        for (List<Integer> face : innerFaces) {
+            Vertex dualVertex = new Vertex(dualGraph.getVertices().size());
+            dualGraph.addVertex(dualVertex);
+            faceToVertexMap.put(face, dualVertex);
+        }
+
+        // Step 5: Add edges whenever two faces share a common edge
+        for (int i = 0; i < innerFaces.size(); i++) {
+            for (int j = i + 1; j < innerFaces.size(); j++) {
+                List<Integer> face1 = innerFaces.get(i);
+                List<Integer> face2 = innerFaces.get(j);
+
+                // Check if face1 and face2 share a common edge
+                for (int k = 0; k < face1.size(); k++) {
+                    for (int l = 0; l < face2.size(); l++) {
+                        int vertex1 = face1.get(k);
+                        int vertex2 = face1.get((k + 1) % face1.size());
+                        int vertex3 = face2.get(l);
+                        int vertex4 = face2.get((l + 1) % face2.size());
+
+                        // Check if the edge (vertex1, vertex2) is the same as (vertex3, vertex4) or (vertex4, vertex3)
+                        if ((vertex1 == vertex3 && vertex2 == vertex4) ||
+                            (vertex1 == vertex4 && vertex2 == vertex3)) {
+                            Vertex dualVertex1 = faceToVertexMap.get(face1);
+                            Vertex dualVertex2 = faceToVertexMap.get(face2);
+                            dualGraph.addEdge(new Edge(dualVertex1, dualVertex2));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return dualGraph;
+    }
 }
