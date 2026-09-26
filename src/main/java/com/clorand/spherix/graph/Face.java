@@ -1,36 +1,41 @@
 package com.clorand.spherix.graph;
 
 import java.util.List;
-import java.util.Map;
 import java.util.ArrayList;
 import java.awt.geom.Point2D;
 
-
 public class Face {
-    private List<Integer> vertices;  // List of vertex IDs that form the face
+    private List<Vertex> vertices;  // List of Vertex objects that form the face
     private List<Edge> edges;        // List of edges that form the boundary of the face
-    private Graph graph;             // Reference to the graph this face belongs to
-    private Map<Integer, Point2D.Double> vertexCoordinates; // Coordinates of the vertices
+    private Point2D.Double centerOfMass; // Center of mass (centroid) of the face
 
-    public Face(List<Integer> vertices, Graph graph, Map<Integer, Point2D.Double> vertexCoordinates) {
+    public Face(List<Vertex> vertices, List<Edge> edges) {
         this.vertices = new ArrayList<>(vertices);
-        this.graph = graph;
-        this.vertexCoordinates = vertexCoordinates;
-        this.edges = new ArrayList<>();
-        this.initializeEdges();
+        this.edges = new ArrayList<>(edges);
+        this.centerOfMass = computeCenterOfMass(); // Compute center of mass during initialization
     }
 
-    // Initialize the edges of the face
-    private void initializeEdges() {
-        for (int i = 0; i < vertices.size(); i++) {
-            int u = vertices.get(i);
-            int v = vertices.get((i + 1) % vertices.size());
-            edges.add(new Edge(new Vertex(u), new Vertex(v)));
+    // Compute the center of mass (centroid) of the face
+    private Point2D.Double computeCenterOfMass() {
+        double sumX = 0.0;
+        double sumY = 0.0;
+        int n = vertices.size();
+
+        for (Vertex vertex : vertices) {
+            sumX += vertex.getX();
+            sumY += vertex.getY();
         }
+
+        return new Point2D.Double(sumX / n, sumY / n);
+    }
+
+    // Get the center of mass of the face
+    public Point2D.Double getCenterOfMass() {
+        return centerOfMass;
     }
 
     // Get the vertices of the face
-    public List<Integer> getVertices() {
+    public List<Vertex> getVertices() {
         return new ArrayList<>(vertices);
     }
 
@@ -39,15 +44,20 @@ public class Face {
         return new ArrayList<>(edges);
     }
 
+    // Check if the face contains a specific vertex
+    public boolean containsVertex(Vertex vertex) {
+        return vertices.contains(vertex);
+    }
+
     // Compute the area of the face using the shoelace formula
     public double getArea() {
         double area = 0.0;
         int n = vertices.size();
         for (int i = 0; i < n; i++) {
             int j = (i + 1) % n;
-            Point2D.Double p1 = vertexCoordinates.get(vertices.get(i));
-            Point2D.Double p2 = vertexCoordinates.get(vertices.get(j));
-            area += (p1.x * p2.y) - (p2.x * p1.y);
+            Vertex p1 = vertices.get(i);
+            Vertex p2 = vertices.get(j);
+            area += (p1.getX() * p2.getY()) - (p2.getX() * p1.getY());
         }
         return Math.abs(area) / 2.0;
     }
@@ -66,12 +76,8 @@ public class Face {
 
     // Check if this face contains a specific edge
     public boolean containsEdge(Edge edge) {
-        int u = edge.getSource().getId();
-        int v = edge.getTarget().getId();
         for (Edge faceEdge : edges) {
-            int faceU = faceEdge.getSource().getId();
-            int faceV = faceEdge.getTarget().getId();
-            if ((faceU == u && faceV == v) || (faceU == v && faceV == u)) {
+            if (faceEdge.equals(edge)) {
                 return true;
             }
         }
@@ -93,4 +99,8 @@ public class Face {
     public String toString() {
         return "Face: " + vertices;
     }
+
+	public int size() {
+		return vertices.size();
+	}
 }

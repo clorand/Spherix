@@ -1,5 +1,6 @@
 package com.clorand.spherix.graph;
 
+import java.awt.geom.Point2D;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.commons.math3.linear.*;
@@ -204,8 +205,13 @@ public class Graph {
         return cyclicOrder;
     }
 
-    // Find all faces in the planar embedding
-    public List<List<Integer>> findFaces() {
+ // Find all faces in the planar embedding
+    public List<Face> findFaces() {
+        // Check if the graph is embedded (all vertices have coordinates)
+        if (!isEmbedded()) {
+            throw new IllegalStateException("Graph is not embedded. Cannot find faces.");
+        }
+
         Map<Integer, List<Integer>> cyclicOrder = computeCyclicOrder();
 
         // Create a set of directed edges
@@ -218,63 +224,98 @@ public class Graph {
         }
 
         Set<String> visited = new HashSet<>();
-        List<List<Integer>> faces = new ArrayList<>();
+        List<Face> faces = new ArrayList<>();
 
         for (String startEdge : directedEdges) {
             if (visited.contains(startEdge)) {
                 continue;
             }
 
-            List<Integer> face = new ArrayList<>();
+            List<Vertex> faceVertices = new ArrayList<>();
+            List<Edge> faceEdges = new ArrayList<>();
             String currentEdge = startEdge;
             String[] edgeParts = currentEdge.split(",");
-            int u = Integer.parseInt(edgeParts[0]);
-            int v = Integer.parseInt(edgeParts[1]);
+            int uId = Integer.parseInt(edgeParts[0]);
+            int vId = Integer.parseInt(edgeParts[1]);
+
+            Vertex u = getVertexById(uId);
+            Vertex v = getVertexById(vId);
 
             // Start traversing the face
             while (!visited.contains(currentEdge)) {
                 visited.add(currentEdge);
-                face.add(u);
+                faceVertices.add(u);
+                faceEdges.add(new Edge(u, v));
 
                 // Get the cyclic order of neighbors around v
-                List<Integer> neighbors = cyclicOrder.get(v);
+                List<Integer> neighbors = cyclicOrder.get(v.getId());
                 if (neighbors == null || neighbors.isEmpty()) {
                     break; // No neighbors to traverse
                 }
 
                 // Find the index of u in the neighbors list
-                int index = neighbors.indexOf(u);
+                int index = neighbors.indexOf(u.getId());
                 if (index == -1) {
                     break; // u is not a neighbor of v (should not happen for valid graphs)
                 }
 
                 // Take the previous edge in cyclic order (left-hand rule)
-                int nextNeighbor = neighbors.get((index - 1 + neighbors.size()) % neighbors.size());
+                int nextNeighborId = neighbors.get((index - 1 + neighbors.size()) % neighbors.size());
+                Vertex nextNeighbor = getVertexById(nextNeighborId);
 
                 // Move to the next directed edge
-                currentEdge = v + "," + nextNeighbor;
+                currentEdge = v.getId() + "," + nextNeighbor.getId();
                 edgeParts = currentEdge.split(",");
-                u = Integer.parseInt(edgeParts[0]);
-                v = Integer.parseInt(edgeParts[1]);
+                uId = Integer.parseInt(edgeParts[0]);
+                vId = Integer.parseInt(edgeParts[1]);
+                u = getVertexById(uId);
+                v = getVertexById(vId);
             }
 
             // Remove consecutive duplicates (but preserve the start/end vertex)
-            List<Integer> uniqueFace = new ArrayList<>();
-            for (int vertex : face) {
-                if (uniqueFace.isEmpty() || vertex != uniqueFace.get(uniqueFace.size() - 1)) {
-                    uniqueFace.add(vertex);
+            List<Vertex> uniqueFaceVertices = new ArrayList<>();
+            for (Vertex vertex : faceVertices) {
+                if (uniqueFaceVertices.isEmpty() || !uniqueFaceVertices.get(uniqueFaceVertices.size() - 1).equals(vertex)) {
+                    uniqueFaceVertices.add(vertex);
+                }
+            }
+
+            // Remove duplicate edges
+            List<Edge> uniqueFaceEdges = new ArrayList<>();
+            for (Edge edge : faceEdges) {
+                if (uniqueFaceEdges.isEmpty() || !uniqueFaceEdges.get(uniqueFaceEdges.size() - 1).equals(edge)) {
+                    uniqueFaceEdges.add(edge);
                 }
             }
 
             // Only add the face if it has at least 3 unique vertices
-            if (uniqueFace.size() >= 3) {
-                faces.add(uniqueFace);
+            if (uniqueFaceVertices.size() >= 3) {
+                Face face = new Face(uniqueFaceVertices, uniqueFaceEdges);
+                faces.add(face);
             }
         }
 
+        // Sort faces by the x-coordinate of their center of mass
+        faces.sort((face1, face2) -> {
+            double x1 = face1.getCenterOfMass().x;
+            double x2 = face2.getCenterOfMass().x;
+            return Double.compare(x1, x2);
+        });
+
         return faces;
     }
-    
+
+
+    // Helper method to check if the graph is embedded (all vertices have coordinates)
+    private boolean isEmbedded() {
+        for (Vertex vertex : vertices) {
+            if (vertex.getX() == 0.0 && vertex.getY() == 0.0) {
+                // Assuming (0, 0) is the default coordinate for non-embedded vertices
+                return false;
+            }
+        }
+        return true;
+    }    
  // Get the boundary vertex based on the specified direction
     public Vertex getBoundaryVertex(BoundaryDirection direction) {
         if (vertices.isEmpty()) {
@@ -342,17 +383,17 @@ public class Graph {
     }
     
  // Get the list of faces that contain the boundary vertex (e.g., leftmost, rightmost, etc.)
-    public List<List<Integer>> getBoundaryFaces(BoundaryDirection direction) {
+    public List<Face> getBoundaryFaces(BoundaryDirection direction) {
         Vertex boundaryVertex = getBoundaryVertex(direction);
         if (boundaryVertex == null) {
             return new ArrayList<>(); // No boundary vertex found
         }
 
-        List<List<Integer>> boundaryFaces = new ArrayList<>();
-        List<List<Integer>> allFaces = findFaces();
+        List<Face> boundaryFaces = new ArrayList<>();
+        List<Face> allFaces = findFaces();
 
-        for (List<Integer> face : allFaces) {
-            if (face.contains(boundaryVertex.getId())) {
+        for (Face face : allFaces) {
+            if (face.containsVertex(boundaryVertex)) {
                 boundaryFaces.add(face);
             }
         }
@@ -361,9 +402,9 @@ public class Graph {
     }
     
     
-    public void stretch(ExtendDirection direction, Vertex start, Vertex end) {
+    public RealVector stretch(ExtendDirection direction, Vertex start, Vertex end) {
         if (vertices.isEmpty() || start == null || end == null) {
-            return; // No vertices or invalid start/end
+            return null; // No vertices or invalid start/end
         }
 
         // Step 1: Fix start position = 0 and end position = 1
@@ -415,7 +456,6 @@ public class Graph {
         // Step 5: Compute stretched positions: x_free = comatrix * b_free
         RealVector stretchedPositions = comatrix.operate(new ArrayRealVector(bFree));
         
-        System.out.println("stretchedPositions:"+stretchedPositions);
 
         // Step 6: Update the coordinates of the free vertices
         for (int i = 0; i < m; i++) {
@@ -430,17 +470,38 @@ public class Graph {
             }
         }
         
-        // Step 7: Compute the determinant of the comatrix
+        // Step 7: Compute the determinant of free Laplacian
         double detL_ff = new LUDecomposition(freeLaplacian).getDeterminant();
+        
+        // Create a new vector with 0 as the first entry and detL_ff as the last entry
+        double[] newStretchedPositionsData = new double[m + 2];
+        newStretchedPositionsData[0] = 0.0; // First entry is 0
+        System.arraycopy(stretchedPositions.toArray(), 0, newStretchedPositionsData, 1, m); // Copy stretchedPositions
+        newStretchedPositionsData[m + 1] = detL_ff; // Last entry is detL_ff
+
+        
+     // Create a new RealVector with the updated data
+        RealVector newStretchedPositions = new ArrayRealVector(newStretchedPositionsData);
+        
+        //System.out.println("stretchedPositions:"+newStretchedPositions);
+
 
         // Step 8: Update the coordinates of the fixed vertices (start and end)
         if (direction == ExtendDirection.HORIZONTAL) {
             start.setX(0.0 * detL_ff);
-            end.setX(1.0 * detL_ff);
+            end.setX(1.0 * Math.round(detL_ff));
         } else if (direction == ExtendDirection.VERTICAL) {
             start.setY(0.0 * detL_ff);
-            end.setY(1.0 * detL_ff);
+            end.setY(1.0 * Math.round(detL_ff));
         }
+        
+        // Step 9: refresh edges after stretching       
+        for (Edge e:edges)
+        {
+        	e.refresh();
+        }
+        
+        return newStretchedPositions;
     }
 
     // Helper method to compute the adjugate (comatrix) of a matrix
@@ -481,7 +542,7 @@ public class Graph {
 
 
         // Step 2: Detect the faces of the extended graph
-        List<List<Integer>> faces = findFaces();
+        List<Face> faces = findFaces();
 
         // Step 3: Identify and remove the outer face
         // The outer face is the one that contains the leftmost, rightmost, northmost, and southmost vertices
@@ -490,21 +551,21 @@ public class Graph {
         Vertex northmost = getBoundaryVertex(BoundaryDirection.UP);
         Vertex southmost = getBoundaryVertex(BoundaryDirection.DOWN);
 
-        List<List<Integer>> innerFaces = new ArrayList<>();
-        for (List<Integer> face : faces) {
-            if (!face.contains(leftmost.getId()) ||
-                !face.contains(rightmost.getId()) ||
-                !face.contains(northmost.getId()) ||
-                !face.contains(southmost.getId())) {
+        List<Face> innerFaces = new ArrayList<>();
+        for (Face face : faces) {
+            if (!face.containsVertex(leftmost) ||
+                !face.containsVertex(rightmost) ||
+                !face.containsVertex(northmost) ||
+                !face.containsVertex(southmost)) {
                 innerFaces.add(face);
             }
         }
 
         // Step 4: Build the dual graph by mapping the remaining faces to vertices
         Graph dualGraph = new Graph();
-        Map<List<Integer>, Vertex> faceToVertexMap = new HashMap<>();
+        Map<Face, Vertex> faceToVertexMap = new HashMap<>();
 
-        for (List<Integer> face : innerFaces) {
+        for (Face face : innerFaces) {
             Vertex dualVertex = new Vertex(dualGraph.getVertices().size());
             dualGraph.addVertex(dualVertex);
             faceToVertexMap.put(face, dualVertex);
@@ -513,20 +574,17 @@ public class Graph {
         // Step 5: Add edges whenever two faces share a common edge
         for (int i = 0; i < innerFaces.size(); i++) {
             for (int j = i + 1; j < innerFaces.size(); j++) {
-                List<Integer> face1 = innerFaces.get(i);
-                List<Integer> face2 = innerFaces.get(j);
+                Face face1 = innerFaces.get(i);
+                Face face2 = innerFaces.get(j);
+                
+                List<Edge> edges1 = face1.getEdges();
+                List<Edge> edges2 = face2.getEdges();
 
                 // Check if face1 and face2 share a common edge
-                for (int k = 0; k < face1.size(); k++) {
-                    for (int l = 0; l < face2.size(); l++) {
-                        int vertex1 = face1.get(k);
-                        int vertex2 = face1.get((k + 1) % face1.size());
-                        int vertex3 = face2.get(l);
-                        int vertex4 = face2.get((l + 1) % face2.size());
-
-                        // Check if the edge (vertex1, vertex2) is the same as (vertex3, vertex4) or (vertex4, vertex3)
-                        if ((vertex1 == vertex3 && vertex2 == vertex4) ||
-                            (vertex1 == vertex4 && vertex2 == vertex3)) {
+                for (int k = 0; k < edges1.size(); k++) {
+                    for (int l = 0; l < edges2.size(); l++) {
+                        if (edges1.get(k).equals(edges2.get(l))) 
+                        {
                             Vertex dualVertex1 = faceToVertexMap.get(face1);
                             Vertex dualVertex2 = faceToVertexMap.get(face2);
                             dualGraph.addEdge(new Edge(dualVertex1, dualVertex2));
@@ -538,5 +596,80 @@ public class Graph {
         }
         
         return dualGraph;
+    }
+    
+    /**
+     * Sorts the edges in the graph by:
+     * 1. The x-coordinate of the start vertex.
+     * 2. The y-coordinate of the end vertex (if start vertices have the same x-coordinate).
+     */
+    public void sortEdges() {
+        edges.sort((edge1, edge2) -> {
+            Vertex source1 = edge1.getSource();
+            Vertex source2 = edge2.getSource();
+            Vertex target1 = edge1.getTarget();
+            Vertex target2 = edge2.getTarget();
+
+            // Compare by start vertex x-coordinate
+            int xCompare = Double.compare(source1.getX(), source2.getX());
+            if (xCompare != 0) {
+                return xCompare;
+            }
+
+            // If start vertices have the same x-coordinate, compare by end vertex y-coordinate
+            return Double.compare(target2.getY(), target1.getY());
+        });
+    }
+    
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Edges: ");
+        for (int i = 0; i < edges.size(); i++) {
+            Edge e = edges.get(i);
+            if (i > 0) sb.append(", ");
+            sb.append("(").append(e.getSource().getId())
+              .append(", ").append(e.getTarget().getId()).append(")");
+        }
+        sb.append("\nCoordinates: ");
+        List<Vertex> sorted = new ArrayList<>(vertices);
+        sorted.sort(Comparator.comparingInt(Vertex::getId));
+        for (int i = 0; i < sorted.size(); i++) {
+            Vertex v = sorted.get(i);
+            if (i > 0) sb.append(", ");
+            sb.append(v.getId()).append("=(")
+              .append(v.getX()).append(", ").append(v.getY()).append(")");
+        }
+        return sb.toString();
+    }
+    
+    public String toEdgeString() {
+        return edges.stream()
+                .map(e -> "(" + e.getSource().getId() + ", " + e.getTarget().getId() + ")")
+                .collect(Collectors.joining(", "));
+    }
+
+    public Map<Integer, double[]> toCoordinateMap() {
+        Map<Integer, double[]> coords = new LinkedHashMap<>();
+        for (Vertex v : vertices) {
+            coords.put(v.getId(), new double[]{v.getX(), v.getY()});
+        }
+        return coords;
+    }
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Graph)) return false;
+        Graph other = (Graph) o;
+        // same vertex set and same edge set, ignoring insertion order
+        return new HashSet<>(vertices).equals(new HashSet<>(other.vertices))
+                && new HashSet<>(edges).equals(new HashSet<>(other.edges));
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(new HashSet<>(vertices), new HashSet<>(edges));
     }
 }

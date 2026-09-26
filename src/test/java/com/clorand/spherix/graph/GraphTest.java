@@ -1,5 +1,6 @@
 package com.clorand.spherix.graph;
 
+import org.apache.commons.math3.linear.RealVector;
 import org.junit.jupiter.api.Test;
 
 import com.clorand.spherix.graph.Graph.BoundaryDirection;
@@ -24,16 +25,28 @@ public class GraphTest {
         return Graph.fromString(graphStr, coordinates);
     }
 
+    private Graph createDualGraph() {
+    	String graphStr = "(0, 1), (0, 2), (1, 3), (1, 2), (2, 3), (2, 4), (3, 5), (3, 4), (4, 5)";
+        Map<Integer, double[]> coordinates = new HashMap<>();
+        coordinates.put(0, new double[]{ 0.0, 5.0});
+        coordinates.put(1, new double[]{25.0,10.0});
+        coordinates.put(2, new double[]{30.0, 0.0});
+        coordinates.put(3, new double[]{45.0,25.0});
+        coordinates.put(4, new double[]{50.0,15.0});
+        coordinates.put(5, new double[]{75.0,20.0});
+        return Graph.fromString(graphStr, coordinates);
+    }
+    
     @Test
     public void testFaceDetection() {
         Graph graph = createSampleGraph();
 
         // Find the faces
-        List<List<Integer>> detectedFaces = graph.findFaces();
+        List<Face> detectedFaces = graph.findFaces();
 
         // Print detected faces for debugging
         System.out.println("Detected Faces:");
-        for (List<Integer> face : detectedFaces) {
+        for (Face face : detectedFaces) {
             System.out.println(face);
         }
 
@@ -42,7 +55,7 @@ public class GraphTest {
 
         // Verify the outer face (largest face)
         boolean outerFaceFound = false;
-        for (List<Integer> face : detectedFaces) {
+        for (Face face : detectedFaces) {
             if (face.size() == 4) { // The outer face should have 4 vertices for this graph
                 outerFaceFound = true;
                 break;
@@ -57,11 +70,11 @@ public class GraphTest {
         graph.extend(Graph.ExtendDirection.HORIZONTAL);
 
         // Find the faces
-        List<List<Integer>> detectedFaces = graph.findFaces();
+        List<Face> detectedFaces = graph.findFaces();
 
         // Print detected faces for debugging
         System.out.println("Detected Faces:");
-        for (List<Integer> face : detectedFaces) {
+        for (Face face : detectedFaces) {
             System.out.println(face);
         }
 
@@ -70,7 +83,7 @@ public class GraphTest {
 
         // Verify the outer face (largest face)
         boolean outerFaceFound = false;
-        for (List<Integer> face : detectedFaces) {
+        for (Face face : detectedFaces) {
             if (face.size() == 4) { // The outer face should have 4 vertices for this graph
                 outerFaceFound = true;
                 break;
@@ -231,18 +244,18 @@ public class GraphTest {
     @Test
     public void testLeftmostFaces() {
         Graph graph = createSampleGraph();
-        List<List<Integer>> leftmostFaces = graph.getBoundaryFaces(BoundaryDirection.LEFT);
+        List<Face> leftmostFaces = graph.getBoundaryFaces(BoundaryDirection.LEFT);
 
         // Print the leftmost faces for debugging
         System.out.println("Leftmost Faces:");
-        for (List<Integer> face : leftmostFaces) {
+        for (Face face : leftmostFaces) {
             System.out.println(face);
         }
 
         // Verify that the leftmost vertex (vertex 1) is in all leftmost faces
         Vertex leftmostVertex = graph.getBoundaryVertex(BoundaryDirection.LEFT);
-        for (List<Integer> face : leftmostFaces) {
-            assertTrue(face.contains(leftmostVertex.getId()),
+        for (Face face : leftmostFaces) {
+            assertTrue(face.containsVertex(leftmostVertex),
                 "Leftmost vertex should be in all leftmost faces.");
         }
     }
@@ -250,18 +263,18 @@ public class GraphTest {
     @Test
     public void testRightmostFaces() {
         Graph graph = createSampleGraph();
-        List<List<Integer>> rightmostFaces = graph.getBoundaryFaces(BoundaryDirection.RIGHT);
+        List<Face> rightmostFaces = graph.getBoundaryFaces(BoundaryDirection.RIGHT);
 
         // Print the rightmost faces for debugging
         System.out.println("Rightmost Faces:");
-        for (List<Integer> face : rightmostFaces) {
+        for (Face face : rightmostFaces) {
             System.out.println(face);
         }
 
         // Verify that the rightmost vertex (vertex 4) is in all rightmost faces
         Vertex rightmostVertex = graph.getBoundaryVertex(BoundaryDirection.RIGHT);
-        for (List<Integer> face : rightmostFaces) {
-            assertTrue(face.contains(rightmostVertex.getId()),
+        for (Face face : rightmostFaces) {
+            assertTrue(face.containsVertex(rightmostVertex),
                 "Rightmost vertex should be in all rightmost faces.");
         }
     }
@@ -269,18 +282,18 @@ public class GraphTest {
     @Test
     public void testNorthmostFaces() {
         Graph graph = createSampleGraph();
-        List<List<Integer>> northmostFaces = graph.getBoundaryFaces(BoundaryDirection.UP);
+        List<Face> northmostFaces = graph.getBoundaryFaces(BoundaryDirection.UP);
 
         // Print the northmost faces for debugging
         System.out.println("Northmost Faces:");
-        for (List<Integer> face : northmostFaces) {
+        for (Face face : northmostFaces) {
             System.out.println(face);
         }
 
         // Verify that the northmost vertex (vertex 0) is in all northmost faces
         Vertex northmostVertex = graph.getBoundaryVertex(BoundaryDirection.UP);
-        for (List<Integer> face : northmostFaces) {
-            assertTrue(face.contains(northmostVertex.getId()),
+        for (Face face : northmostFaces) {
+            assertTrue(face.containsVertex(northmostVertex),
                 "Northmost vertex should be in all northmost faces.");
         }
     }
@@ -288,18 +301,18 @@ public class GraphTest {
     @Test
     public void testSouthmostFaces() {
         Graph graph = createSampleGraph();
-        List<List<Integer>> southmostFaces = graph.getBoundaryFaces(BoundaryDirection.DOWN);
+        List<Face> southmostFaces = graph.getBoundaryFaces(BoundaryDirection.DOWN);
 
         // Print the southmost faces for debugging
         System.out.println("Southmost Faces:");
-        for (List<Integer> face : southmostFaces) {
+        for (Face face : southmostFaces) {
             System.out.println(face);
         }
 
         // Verify that the southmost vertex (vertex 5) is in all southmost faces
         Vertex southmostVertex = graph.getBoundaryVertex(BoundaryDirection.DOWN);
-        for (List<Integer> face : southmostFaces) {
-            assertTrue(face.contains(southmostVertex.getId()),
+        for (Face face : southmostFaces) {
+            assertTrue(face.containsVertex(southmostVertex),
                 "Southmost vertex should be in all southmost faces.");
         }
     }
@@ -392,45 +405,51 @@ public class GraphTest {
         // Create the sample graph
         Graph graph = createSampleGraph();
 
-        // Get the dual graph
         Graph dualGraph = graph.getDualGraph();
-
+        
         // Print the dual graph for debugging
         System.out.println("Dual Graph Vertices:");
         for (Vertex vertex : dualGraph.getVertices()) {
             System.out.println("Vertex " + vertex.getId());
         }
-
+             
+        RealVector horizontalStretch = dualGraph.stretch(ExtendDirection.HORIZONTAL, dualGraph.getVertexById(0), dualGraph.getVertexById(5));
+        RealVector verticalStretch =dualGraph.stretch(ExtendDirection.VERTICAL, dualGraph.getVertexById(2), dualGraph.getVertexById(3));
+        
+        dualGraph.sortEdges();
+        
+        System.out.println("Dual Graph String:"+dualGraph);
+        
         System.out.println("\nDual Graph Edges:");
         for (Edge edge : dualGraph.getEdges()) {
-            System.out.println("Edge: " + edge.getSource().getId() + " -> " + edge.getTarget().getId());
+            System.out.println(""+edge);
         }
-                
-        dualGraph.stretch(ExtendDirection.HORIZONTAL, dualGraph.getVertexById(0), dualGraph.getVertexById(2));
-        dualGraph.stretch(ExtendDirection.VERTICAL, dualGraph.getVertexById(3), dualGraph.getVertexById(4));
-
-        // Print the faces of the dual graph
-        List<List<Integer>> dualFaces = dualGraph.findFaces();
-        System.out.println("\nDual Graph Faces:");
-        for (List<Integer> face : dualFaces) {
-            System.out.println(face);
-        }
+        
+        System.out.println("horizontalStretch:"+horizontalStretch);
+        System.out.println("verticalStretch  :"+verticalStretch);
+        
+        Graph expectedDualGraph = createDualGraph();
+        
+        String dualGraphStr = dualGraph.toString();
+        String expectedDualGraphStr = expectedDualGraph.toString();
+        
+        System.out.println("dualGraphStr:"+dualGraphStr);
+        System.out.println("expectedDualGraphStr:"+expectedDualGraphStr);
+        
+        assertEquals(dualGraphStr, expectedDualGraphStr);   
+        assertEquals(dualGraph, expectedDualGraph);
+    }
+    
+    @Test
+    public void testGraphToString() {	
+        String ExpectedGraphStr = "(0, 1), (0, 2), (0, 4), (2, 1), (2, 3), (3, 4), (1, 5), (3, 5), (4, 5)";        
+        Graph graph = createSampleGraph();
+        String graphStr = graph.toEdgeString();
+        
+        System.out.println("ExpectedGraphStr:"+ExpectedGraphStr );
+        System.out.println("GraphStr:"+graphStr );
 
         
-        // Expected number of vertices in the dual graph
-        // For your sample graph, the dual graph should have 5 vertices (one for each inner face)
-        int expectedVertices = 6;
-        assertEquals(expectedVertices, dualGraph.getVertices().size(),
-            "Dual graph should have " + expectedVertices + " vertices.");
-
-        // Expected number of edges in the dual graph
-        // For your sample graph, the dual graph should have 9 edges
-        int expectedEdges = 9;
-        assertEquals(expectedEdges, dualGraph.getEdges().size(),
-            "Dual graph should have " + expectedEdges + " edges.");
-
-        // Verify that the dual graph is connected
-        // This is a simple check to ensure that the dual graph has edges
-        assertTrue(dualGraph.getEdges().size() > 0, "Dual graph should have edges.");
+        assertEquals(graphStr, ExpectedGraphStr);
     }
 }
